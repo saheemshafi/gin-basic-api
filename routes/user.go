@@ -7,13 +7,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/saheemshafi/gin-basic-api/db"
-	"github.com/saheemshafi/gin-basic-api/model"
+	"github.com/saheemshafi/gin-basic-api/models"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
 func CreateAccount(ctx *gin.Context) {
 
-	var user model.User
+	var user models.User
 
 	if err := ctx.ShouldBindJSON(&user); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
@@ -22,7 +22,7 @@ func CreateAccount(ctx *gin.Context) {
 		return
 	}
 
-	var existingUser model.User
+	var existingUser models.User
 	db.Db.Collection("users").
 		FindOne(context.TODO(), bson.M{"email": user.Email}).
 		Decode(&existingUser)
@@ -72,7 +72,7 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	var user model.User
+	var user models.User
 	if err := result.Decode(&user); err != nil {
 		log.Println(err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
