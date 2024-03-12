@@ -56,7 +56,7 @@ func Login(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&credentials); err != nil {
-		ctx.JSON(http.StatusBadRequest, bson.M{
+		ctx.JSON(http.StatusBadRequest, gin.H{
 			"message": err.Error(),
 		})
 		return
@@ -66,7 +66,7 @@ func Login(ctx *gin.Context) {
 		FindOne(context.TODO(), bson.M{"email": credentials.Email})
 
 	if err := result.Err(); err != nil {
-		ctx.JSON(http.StatusNotFound, bson.M{
+		ctx.JSON(http.StatusNotFound, gin.H{
 			"message": err.Error(),
 		})
 		return
@@ -75,24 +75,24 @@ func Login(ctx *gin.Context) {
 	var user model.User
 	if err := result.Decode(&user); err != nil {
 		log.Println(err.Error())
-		ctx.JSON(http.StatusInternalServerError, bson.M{
+		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Something went wrong",
 		})
 		return
 	}
 
 	if user.Email != credentials.Email && user.Password != credentials.Password {
-		ctx.JSON(http.StatusOK, bson.M{
+		ctx.JSON(http.StatusOK, gin.H{
 			"message": "Invalid credentials",
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, bson.M{
+	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Logged in",
 	})
 }
 
-func UpdateUser(context *gin.Context) {
+func UpdateUser(ctx *gin.Context) {
 
 }
