@@ -1,4 +1,4 @@
-package main
+package db
 
 import (
 	"context"
@@ -9,17 +9,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-type MongoDb struct {
-	Client       *mongo.Client
-	Database     *mongo.Database
-	databaseName string
-}
+var Db *mongo.Database
 
-var Mongo = MongoDb{
-	databaseName: "gin-basic-api",
-}
-
-func (db *MongoDb) connectDatabase() {
+func Connect() {
 
 	log.Println("Connecting to database")
 
@@ -37,7 +29,6 @@ func (db *MongoDb) connectDatabase() {
 		log.Fatalln(err)
 	}
 
-	Mongo.Client = client
-	Mongo.Database = client.Database(Mongo.databaseName)
+	Db = client.Database("gin-basic-api")
 	log.Println("Database connected...")
 }

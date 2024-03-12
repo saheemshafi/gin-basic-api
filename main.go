@@ -4,7 +4,10 @@ import (
 	"context"
 	"log"
 
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"github.com/saheemshafi/gin-basic-api/db"
+	"github.com/saheemshafi/gin-basic-api/routes"
 )
 
 func main() {
@@ -13,14 +16,12 @@ func main() {
 		log.Println("No .env file found")
 	}
 
-	Mongo.connectDatabase()
-	defer func() {
-		log.Fatalln(Mongo.Client.Disconnect(context.Background()))
-	}()
+	db.Connect()
+	defer db.Db.Client().Disconnect(context.TODO())
 
-	server := Server{
-		Address: ":5000",
-	}
+	app := gin.Default()
 
-	server.Initialize()
+	routes.Register(app)
+
+	log.Fatal(app.Run(":5000"))
 }
