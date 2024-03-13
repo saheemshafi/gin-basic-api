@@ -92,7 +92,7 @@ func Login(ctx *gin.Context) {
 	}
 
 	sessionTime := time.Now().Add(24 * time.Hour)
-	token, err := utils.EncodeJWT(user.Id.String(), sessionTime)
+	token, err := utils.EncodeJWT(user.Id.Hex(), sessionTime)
 
 	if err != nil {
 		ctx.JSON(http.StatusOK, gin.H{
@@ -119,4 +119,16 @@ func Login(ctx *gin.Context) {
 
 func UpdateUser(ctx *gin.Context) {
 
+	user, exists := ctx.Get("user")
+
+	if !exists {
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "Not authorized to access this route",
+		})
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "user retrieved from middleware",
+		"user":    user,
+	})
 }

@@ -19,7 +19,7 @@ func EncodeJWT(id string, expires time.Time) (string, error) {
 	return token.SignedString([]byte(os.Getenv("JWT_SECRET")))
 }
 
-func DecodeJWT(tokenString string) (*jwt.RegisteredClaims, error) {
+func DecodeJWT(tokenString string) (jwt.MapClaims, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, jwt.MapClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(os.Getenv("JWT_SECRET")), nil
@@ -29,11 +29,11 @@ func DecodeJWT(tokenString string) (*jwt.RegisteredClaims, error) {
 		return nil, errors.New("failed to decode token")
 	}
 
-	claims, ok := token.Claims.(jwt.RegisteredClaims)
+	claims, ok := token.Claims.(jwt.MapClaims)
 
 	if !token.Valid || !ok {
 		return nil, errors.New("token is not valid")
 	}
 
-	return &claims, nil
+	return claims, nil
 }

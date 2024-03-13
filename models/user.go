@@ -14,7 +14,7 @@ type User struct {
 	Id        primitive.ObjectID `json:"_id" bson:"_id"`
 	Name      string             `json:"name" bson:"name" binding:"required"`
 	Email     string             `json:"email" bson:"email" binding:"required,email"`
-	Password  string             `json:"-" bson:"password" binding:"required"`
+	Password  string             `json:"password,omitempty" bson:"password" binding:"required"`
 	CreatedAt primitive.DateTime `json:"createdAt" bson:"createdAt"`
 	UpdatedAt primitive.DateTime `json:"updatedAt" bson:"updatedAt"`
 }
