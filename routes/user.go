@@ -4,10 +4,12 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/saheemshafi/gin-basic-api/db"
 	"github.com/saheemshafi/gin-basic-api/models"
+	"github.com/saheemshafi/gin-basic-api/utils"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -37,8 +39,8 @@ func CreateAccount(ctx *gin.Context) {
 	_, err := user.Insert()
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Account creation failed",
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
 		})
 		return
 	}
@@ -73,6 +75,7 @@ func Login(ctx *gin.Context) {
 	}
 
 	var user models.User
+
 	if err := result.Decode(&user); err != nil {
 		log.Println(err.Error())
 		ctx.JSON(http.StatusInternalServerError, gin.H{
@@ -81,15 +84,36 @@ func Login(ctx *gin.Context) {
 		return
 	}
 
-	if user.Email != credentials.Email && user.Password != credentials.Password {
-		ctx.JSON(http.StatusOK, gin.H{
+	if !utils.ComparePasswordHashes(credentials.Password, user.Password) {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"message": "Invalid credentials",
 		})
 		return
 	}
 
+	sessionTime := time.Now().Add(24 * time.Hour)
+	token, err := utils.EncodeJWT(user.Id.String(), sessionTime)
+
+	if err != nil {
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "Failed to login",
+		})
+		return
+	}
+
+	ctx.SetCookie(
+		"token",
+		token,
+		int(time.Until(sessionTime).Seconds()),
+		"/",
+		"localhost",
+		false,
+		true,
+	)
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Logged in",
+		"token":   token,
 	})
 }
 
