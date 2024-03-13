@@ -119,16 +119,33 @@ func Login(ctx *gin.Context) {
 
 func UpdateUser(ctx *gin.Context) {
 
-	user, exists := ctx.Get("user")
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
 
-	if !exists {
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "Not authorized to access this route",
+	var updates struct {
+		Name string `binding:"required"`
+	}
+
+	if err := ctx.ShouldBindJSON(&updates); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
 		})
+		return
+	}
+
+	result, err := db.Db.Collection("users").UpdateByID(
+		context.Background(),
+		user.Id, bson.M{"$set": bson.M{"name": updates.Name}},
+	)
+
+	if result.ModifiedCount == 0 || err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to update user",
+		})
+		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{
-		"message": "user retrieved from middleware",
-		"user":    user,
+		"message": "Updated user details",
 	})
 }
