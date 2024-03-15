@@ -11,6 +11,7 @@ import (
 	"github.com/saheemshafi/gin-basic-api/models"
 	"github.com/saheemshafi/gin-basic-api/utils"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func CreateAccount(ctx *gin.Context) {
@@ -135,7 +136,13 @@ func UpdateUser(ctx *gin.Context) {
 
 	result, err := db.Db.Collection("users").UpdateByID(
 		context.Background(),
-		user.Id, bson.M{"$set": bson.M{"name": updates.Name}},
+		user.Id,
+		bson.M{
+			"$set": bson.M{
+				"name":      updates.Name,
+				"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
+			},
+		},
 	)
 
 	if result.ModifiedCount == 0 || err != nil {
