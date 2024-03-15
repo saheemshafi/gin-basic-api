@@ -14,4 +14,14 @@ func Register(app *gin.Engine) {
 	users.POST("/create-account", CreateAccount)
 	users.POST("/login", Login)
 	users.PUT("/", middlewares.Authorize, UpdateUser)
+
+	// Book routes
+	books := v1.Group("/books")
+	books.GET("/", GetBooks)
+	books.GET("/{id}", GetBook)
+	books.POST("/", middlewares.Authorize, CreateBook)
+	books.PUT("/", middlewares.Authorize, UpdateBook)
+	books.DELETE("/", middlewares.Authorize, DeleteBook)
+	books.POST("/{id}/pages", middlewares.Authorize, AddPage)
+	books.POST("/{id}/pages/{id}", middlewares.Authorize, UpdatePage)
 }
