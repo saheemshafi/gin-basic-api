@@ -2,6 +2,7 @@ package middlewares
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,7 @@ func Authorize(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"message": "You are not logged in",
 		})
+		ctx.Abort()
 		return
 	}
 
@@ -29,6 +31,7 @@ func Authorize(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, gin.H{
 			"message": err.Error(),
 		})
+		ctx.Abort()
 		return
 	}
 
@@ -37,10 +40,13 @@ func Authorize(ctx *gin.Context) {
 	options := options.FindOne().SetProjection(bson.M{"password": 0})
 	result := db.Db.Collection("users").FindOne(context.Background(), bson.M{"_id": userId}, options)
 
+	log.Println(result)
+
 	if err := result.Err(); err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": err.Error(),
+			"message": "Not authorized",
 		})
+		ctx.Abort()
 		return
 	}
 
