@@ -2,8 +2,10 @@ package routes
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func CreateBook(ctx *gin.Context) {
@@ -107,7 +110,68 @@ func UpdatePage(ctx *gin.Context) {
 }
 
 func UpdateBook(ctx *gin.Context) {
+	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid book id",
+		})
+		return
+	}
+
+	var bookInfo struct {
+		Title       string
+		Description string
+	}
+
+	if err := ctx.ShouldBindJSON(&bookInfo); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	var updates = bson.M{}
+
+	if strings.TrimSpace(bookInfo.Title) != "" {
+		updates["title"] = bookInfo.Title
+	}
+
+	if strings.TrimSpace(bookInfo.Description) != "" {
+		updates["description"] = bookInfo.Description
+	}
+
+	options := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	result := db.Db.Collection("books").FindOneAndUpdate(
+		context.Background(),
+		bson.M{
+			"_id": bookId,
+		},
+		bson.M{
+			"$set": updates,
+		},
+		options,
+	)
+
+	if err := result.Err(); err != nil {
+		log.Println(err)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, bson.M{
+				"message": err.Error(),
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, bson.M{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Updated book",
+	})
 }
 
 func DeleteBook(ctx *gin.Context) {
@@ -124,17 +188,17 @@ func DeleteBook(ctx *gin.Context) {
 		"_id": bookId,
 	})
 
-	err = result.Err()
+	if err := result.Err(); err != nil {
 
-	if err == mongo.ErrNoDocuments {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"message": err.Error(),
-		})
-		return
-	}
-
-	if err != nil {
 		log.Print(err)
+
+		if err == mongo.ErrNoDocuments {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": err.Error(),
+			})
+			return
+		}
+
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Something went wrong",
 		})
