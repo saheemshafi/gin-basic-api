@@ -23,9 +23,9 @@ func Connect() {
 
 	options := options.Client().ApplyURI(uri).SetAppName("Gin Basic Api")
 
-	client, err := mongo.Connect(context.Background(), options)
+	client, _ := mongo.Connect(context.Background(), options)
 
-	if err != nil {
+	if err := client.Ping(context.Background(), nil); err != nil {
 		log.Fatalln(err)
 	}
 
