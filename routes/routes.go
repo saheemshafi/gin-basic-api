@@ -18,10 +18,10 @@ func Register(app *gin.Engine) {
 	// Book routes
 	books := v1.Group("/books")
 	books.GET("/", GetBooks)
-	books.GET("/{id}", GetBook)
+	books.GET("/:bookId", GetBook)
 	books.POST("/", middlewares.Authorize, CreateBook)
 	books.PUT("/", middlewares.Authorize, UpdateBook)
 	books.DELETE("/", middlewares.Authorize, DeleteBook)
-	books.POST("/{id}/pages", middlewares.Authorize, AddPage)
-	books.POST("/{id}/pages/{id}", middlewares.Authorize, UpdatePage)
+	books.POST("/:bookId/pages", middlewares.Authorize, AddPage)
+	books.POST("/:bookId/pages/:pageId", middlewares.Authorize, UpdatePage)
 }
