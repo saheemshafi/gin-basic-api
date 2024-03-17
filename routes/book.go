@@ -139,6 +139,16 @@ func AddPage(ctx *gin.Context) {
 }
 
 func UpdatePage(ctx *gin.Context) {
+
+	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid book id",
+		})
+		return
+	}
+
 	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
 
 	if err != nil {
@@ -152,10 +162,43 @@ func UpdatePage(ctx *gin.Context) {
 		Title   string
 		Content string
 	}
-	
+
 	if err := ctx.ShouldBindJSON(&pageInfo); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"message": err.Error(),
+		})
+		return
+	}
+
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		log.Println(err)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't update page from this book",
 		})
 		return
 	}
@@ -167,7 +210,7 @@ func UpdatePage(ctx *gin.Context) {
 	}
 
 	updateMap := map[string]string{
-		"title":       pageInfo.Title,
+		"title":   pageInfo.Title,
 		"content": pageInfo.Content,
 	}
 
@@ -231,11 +274,44 @@ func DeletePage(ctx *gin.Context) {
 		return
 	}
 
-	existingPage := db.Db.Collection("pages").FindOneAndDelete(context.Background(), bson.M{
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		log.Println(err)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't delete page from this book",
+		})
+		return
+	}
+
+	page := db.Db.Collection("pages").FindOneAndDelete(context.Background(), bson.M{
 		"_id": pageId,
 	})
 
-	if err := existingPage.Err(); err != nil {
+	if err := page.Err(); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			ctx.JSON(http.StatusNotFound, gin.H{
 				"message": "Page not found",
@@ -262,14 +338,7 @@ func DeletePage(ctx *gin.Context) {
 	)
 
 	if err := result.Err(); err != nil {
-
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
-			return
-		}
-
+		log.Print(err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Failed to remove page",
 		})
@@ -478,7 +547,16 @@ func GetBook(ctx *gin.Context) {
 	result := db.Db.Collection("books").FindOne(context.Background(), bson.M{"_id": bookId})
 
 	if err := result.Err(); err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		log.Println(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": err.Error(),
 		})
 		return
