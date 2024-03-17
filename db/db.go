@@ -11,9 +11,9 @@ import (
 
 var Db *mongo.Database
 
-func Connect() {
+func Connect(connectionCh chan<- string) {
 
-	log.Println("Connecting to database")
+	connectionCh <- "Connecting to database..."
 
 	uri := os.Getenv("MONGODB_URI")
 
@@ -25,10 +25,11 @@ func Connect() {
 
 	client, _ := mongo.Connect(context.Background(), options)
 
+	connectionCh <- "Pinging database instance..."
 	if err := client.Ping(context.Background(), nil); err != nil {
 		log.Fatalln(err)
 	}
 
 	Db = client.Database("gin-basic-api")
-	log.Println("Database connected...")
+	connectionCh <- "Database connected..."
 }
