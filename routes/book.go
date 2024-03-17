@@ -131,6 +131,39 @@ func UpdateBook(ctx *gin.Context) {
 		return
 	}
 
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		log.Println(err)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't update this book",
+		})
+		return
+	}
+
 	var updates = bson.M{}
 
 	if strings.TrimSpace(bookInfo.Title) != "" {
@@ -156,13 +189,6 @@ func UpdateBook(ctx *gin.Context) {
 	if err := result.Err(); err != nil {
 		log.Println(err)
 
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, bson.M{
-				"message": err.Error(),
-			})
-			return
-		}
-
 		ctx.JSON(http.StatusInternalServerError, bson.M{
 			"message": "Something went wrong",
 		})
@@ -184,21 +210,45 @@ func DeleteBook(ctx *gin.Context) {
 		return
 	}
 
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		log.Println(err)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't delete this book",
+		})
+		return
+	}
+
 	result := db.Db.Collection("books").FindOneAndDelete(context.Background(), bson.M{
 		"_id": bookId,
 	})
 
 	if err := result.Err(); err != nil {
-
 		log.Print(err)
-
-		if err == mongo.ErrNoDocuments {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": err.Error(),
-			})
-			return
-		}
-
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"message": "Something went wrong",
 		})
