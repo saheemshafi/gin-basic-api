@@ -68,6 +68,39 @@ func AddPage(ctx *gin.Context) {
 		return
 	}
 
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		log.Println(err)
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't add page to this book",
+		})
+		return
+	}
+
 	insertResult, err := page.Insert()
 
 	if err != nil {
@@ -106,7 +139,146 @@ func AddPage(ctx *gin.Context) {
 }
 
 func UpdatePage(ctx *gin.Context) {
+	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
 
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid page id",
+		})
+		return
+	}
+
+	var pageInfo struct {
+		Title   string
+		Content string
+	}
+	
+	if err := ctx.ShouldBindJSON(&pageInfo); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	updates := bson.M{
+		"$set": bson.M{
+			"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
+		},
+	}
+
+	updateMap := map[string]string{
+		"title":       pageInfo.Title,
+		"content": pageInfo.Content,
+	}
+
+	for key, value := range updateMap {
+		if strings.TrimSpace(value) != "" {
+			updates["$set"].(bson.M)[key] = value
+		}
+	}
+
+	options := options.FindOneAndUpdate().SetReturnDocument(options.After)
+	result := db.Db.Collection("pages").FindOneAndUpdate(
+		context.Background(),
+		bson.M{
+			"_id": pageId,
+		},
+		updates,
+		options,
+	)
+
+	if err := result.Err(); err != nil {
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Page not found",
+			})
+			return
+		}
+
+		log.Print(err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var page models.Page
+	result.Decode(&page)
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Updated page",
+		"data":    page,
+	})
+}
+
+func DeletePage(ctx *gin.Context) {
+	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid book id",
+		})
+		return
+	}
+
+	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid page id",
+		})
+		return
+	}
+
+	existingPage := db.Db.Collection("pages").FindOneAndDelete(context.Background(), bson.M{
+		"_id": pageId,
+	})
+
+	if err := existingPage.Err(); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Page not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to delete",
+		})
+		return
+	}
+
+	result := db.Db.Collection("books").FindOneAndUpdate(
+		context.Background(),
+		bson.M{
+			"_id": bookId,
+		},
+		bson.M{
+			"$pull": bson.M{
+				"pages": pageId,
+			},
+		},
+	)
+
+	if err := result.Err(); err != nil {
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to remove page",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Removed page from book",
+	})
 }
 
 func UpdateBook(ctx *gin.Context) {
@@ -164,14 +336,21 @@ func UpdateBook(ctx *gin.Context) {
 		return
 	}
 
-	var updates = bson.M{}
-
-	if strings.TrimSpace(bookInfo.Title) != "" {
-		updates["title"] = bookInfo.Title
+	var updates = bson.M{
+		"$set": bson.M{
+			"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
+		},
 	}
 
-	if strings.TrimSpace(bookInfo.Description) != "" {
-		updates["description"] = bookInfo.Description
+	updateMap := map[string]string{
+		"title":       bookInfo.Title,
+		"description": bookInfo.Description,
+	}
+
+	for key, value := range updateMap {
+		if strings.TrimSpace(value) != "" {
+			updates["$set"].(bson.M)[key] = value
+		}
 	}
 
 	options := options.FindOneAndUpdate().SetReturnDocument(options.After)
@@ -180,9 +359,7 @@ func UpdateBook(ctx *gin.Context) {
 		bson.M{
 			"_id": bookId,
 		},
-		bson.M{
-			"$set": updates,
-		},
+		updates,
 		options,
 	)
 

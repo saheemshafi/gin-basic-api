@@ -23,5 +23,6 @@ func Register(app *gin.Engine) {
 	books.PUT("/:bookId", middlewares.Authorize, UpdateBook)
 	books.DELETE("/:bookId", middlewares.Authorize, DeleteBook)
 	books.POST("/:bookId/pages", middlewares.Authorize, AddPage)
-	books.POST("/:bookId/pages/:pageId", middlewares.Authorize, UpdatePage)
+	books.PUT("/:bookId/pages/:pageId", middlewares.Authorize, UpdatePage)
+	books.DELETE("/:bookId/pages/:pageId", middlewares.Authorize, DeletePage)
 }
