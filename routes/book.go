@@ -158,7 +158,7 @@ func GetBooks(ctx *gin.Context) {
 
 	var books []models.Book
 
-	err = cursor.All(ctx.Request.Context(), &books)
+	err = cursor.All(context.Background(), &books)
 
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
