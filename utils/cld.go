@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"io"
 	"log"
 	"os"
 
@@ -38,21 +39,19 @@ func InitializeCloudinary(connectionCh chan<- string) {
 }
 
 /*
-Uploads file to cloudinary, closes the file and returns upload result or error
+Uploads file to cloudinary and returns upload result or error
 */
-func UploadFile(file *os.File) (*uploader.UploadResult, error) {
-	defer file.Close()
-
+func UploadFile(file io.Reader) (*uploader.UploadResult, error) {
 	return cloudinaryInstance.Upload.Upload(context.Background(), file, uploader.UploadParams{
 		PublicIDPrefix: "gin-basic-api",
 		ResourceType:   "auto",
-		Type:           api.Auto,
 	})
 }
 
-func DeleteFile(publicId string) (*uploader.DestroyResult, error) {
+func DeleteFile(publicId string, resourceType api.AssetType) (*uploader.DestroyResult, error) {
 	return cloudinaryInstance.Upload.Destroy(context.Background(), uploader.DestroyParams{
 		PublicID:     publicId,
-		ResourceType: "auto",
+		Invalidate:   api.Bool(true),
+		ResourceType: resourceType.String(),
 	})
 }

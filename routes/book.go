@@ -8,9 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cloudinary/cloudinary-go/v2/api"
 	"github.com/gin-gonic/gin"
 	"github.com/saheemshafi/gin-basic-api/db"
 	"github.com/saheemshafi/gin-basic-api/models"
+	"github.com/saheemshafi/gin-basic-api/utils"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -576,4 +578,229 @@ func GetBook(ctx *gin.Context) {
 		"message": "Book retrieved",
 		"data":    book,
 	})
+}
+
+func ChangeBookCover(ctx *gin.Context) {
+	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid book id",
+		})
+		return
+	}
+
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't change this book's cover",
+		})
+		return
+	}
+
+	formFile, err := ctx.FormFile("cover")
+	log.Println(formFile.Filename, formFile.Size)
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	tempCover, err := formFile.Open()
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to open file",
+		})
+		return
+	}
+
+	defer tempCover.Close()
+	uploadResult, err := utils.UploadFile(tempCover)
+
+	if err != nil {
+		log.Println(err)
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "Failed to upload file",
+		})
+		return
+	}
+
+	updateResult, err := db.Db.Collection("books").UpdateByID(context.Background(), bookId, bson.M{
+		"$set": bson.M{
+			"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
+			"cover":     uploadResult.PublicID,
+		},
+	})
+
+	if err != nil || updateResult.ModifiedCount == 0 {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to change cover",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Changed book cover",
+		"data":    uploadResult.PublicID,
+	})
+
+	if book.Cover != "" {
+		result, err := utils.DeleteFile(book.Cover, api.Image)
+
+		if result.Error.Message != "" || err != nil {
+			log.Println(result.Error.Message)
+		}
+	}
+
+}
+
+func ChangePageCover(ctx *gin.Context) {
+	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid book id",
+		})
+		return
+	}
+
+	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"message": "Invalid page id",
+		})
+		return
+	}
+
+	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
+		"_id": bookId,
+	})
+
+	if err := existingBook.Err(); err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusNotFound, gin.H{
+				"message": "Book not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Something went wrong",
+		})
+		return
+	}
+
+	var book models.Book
+	existingBook.Decode(&book)
+
+	userFromCtx, _ := ctx.Get("user")
+	user := userFromCtx.(models.User)
+
+	if book.Author != user.Id {
+		ctx.JSON(http.StatusUnauthorized, gin.H{
+			"message": "You can't change this page's cover",
+		})
+		return
+	}
+
+	formFile, err := ctx.FormFile("cover")
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": err.Error(),
+		})
+		return
+	}
+
+	tempCover, err := formFile.Open()
+
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to open file",
+		})
+		return
+	}
+
+	defer tempCover.Close()
+	uploadResult, err := utils.UploadFile(tempCover)
+
+	if err != nil {
+		log.Println(err)
+		ctx.JSON(http.StatusOK, gin.H{
+			"message": "Failed to upload file",
+		})
+		return
+	}
+
+	updateResult := db.Db.Collection("pages").FindOneAndUpdate(
+		context.Background(),
+		bson.M{
+			"_id": pageId,
+		},
+		bson.M{
+			"$set": bson.M{
+				"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
+				"cover":     uploadResult.PublicID,
+			},
+		})
+
+	if err := updateResult.Err(); err != nil {
+
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"message": "Page not found",
+			})
+			return
+		}
+
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"message": "Failed to change cover",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "Changed page cover",
+		"data":    uploadResult.PublicID,
+	})
+
+	var page models.Page
+	updateResult.Decode(&page)
+
+	if page.Cover != "" {
+		result, err := utils.DeleteFile(page.Cover, api.Image)
+
+		log.Println("Deleting", page.Cover)
+		if result.Error.Message != "" || err != nil {
+			log.Println(result.Error.Message)
+		}
+	}
+
 }

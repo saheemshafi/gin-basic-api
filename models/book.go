@@ -14,7 +14,7 @@ type Book struct {
 	Title       string               `json:"title" bson:"title" binding:"required"`
 	Author      primitive.ObjectID   `json:"author" bson:"author"`
 	Description string               `json:"description" bson:"description" binding:"required"`
-	Cover       string               `json:"cover" bson:"cover" binding:"required"`
+	Cover       string               `json:"cover" bson:"cover"`
 	Pages       []primitive.ObjectID `json:"pages" bson:"pages"`
 	CreatedAt   primitive.DateTime   `json:"createdAt" bson:"createdAt"`
 	UpdatedAt   primitive.DateTime   `json:"updatedAt" bson:"updatedAt"`

@@ -25,4 +25,7 @@ func Register(app *gin.Engine) {
 	books.POST("/:bookId/pages", middlewares.Authorize, AddPage)
 	books.PUT("/:bookId/pages/:pageId", middlewares.Authorize, UpdatePage)
 	books.DELETE("/:bookId/pages/:pageId", middlewares.Authorize, DeletePage)
+
+	books.PUT("/:bookId/cover", middlewares.Authorize, ChangeBookCover)
+	books.PUT("/:bookId/pages/:pageId/cover", middlewares.Authorize, ChangePageCover)
 }
