@@ -582,7 +582,7 @@ func ChangeBookCover(ctx *gin.Context) {
 			},
 		})
 
-	if updateResult.Err(); err != nil {
+	if err := updateResult.Err(); err != nil {
 		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to change cover")
 		return
 	}
