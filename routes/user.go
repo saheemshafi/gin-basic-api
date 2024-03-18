@@ -32,7 +32,7 @@ func CreateAccount(ctx *gin.Context) {
 	).Decode(&existingUser)
 
 	if existingUser.Email == user.Email {
-		utils.WriteResponse(ctx, http.StatusBadRequest, "User with email already exists")
+		utils.WriteResponse(ctx, http.StatusConflict, "User with email already exists")
 		return
 	}
 
