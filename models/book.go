@@ -9,6 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const BookCollection = "books"
+
 type Book struct {
 	Id          primitive.ObjectID   `json:"_id" bson:"_id"`
 	Title       string               `json:"title" bson:"title" binding:"required"`
@@ -26,5 +28,5 @@ func (book *Book) Insert() (*mongo.InsertOneResult, error) {
 	book.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
 	book.UpdatedAt = primitive.NewDateTimeFromTime(time.Now())
 
-	return db.Db.Collection("books").InsertOne(context.TODO(), book)
+	return db.InsertOne(context.Background(), BookCollection, book)
 }

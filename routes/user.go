@@ -19,37 +19,32 @@ func CreateAccount(ctx *gin.Context) {
 	var user models.User
 
 	if err := ctx.ShouldBindJSON(&user); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	var existingUser models.User
-	db.Db.Collection("users").
-		FindOne(context.TODO(), bson.M{"email": user.Email}).
-		Decode(&existingUser)
+
+	db.FindOne(
+		context.Background(),
+		models.UserCollection,
+		bson.M{"email": user.Email},
+	).Decode(&existingUser)
 
 	if existingUser.Email == user.Email {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "User with email already exists",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "User with email already exists")
 		return
 	}
 
 	_, err := user.Insert()
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Account created",
-		"data":    user,
-	})
+	user.Password = ""
+	utils.WriteResponse(ctx, http.StatusOK, "Account created", user)
 }
 
 func Login(ctx *gin.Context) {
@@ -59,19 +54,18 @@ func Login(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&credentials); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	result := db.Db.Collection("users").
-		FindOne(context.TODO(), bson.M{"email": credentials.Email})
+	result := db.FindOne(
+		context.Background(),
+		models.UserCollection,
+		bson.M{"email": credentials.Email},
+	)
 
 	if err := result.Err(); err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -79,16 +73,12 @@ func Login(ctx *gin.Context) {
 
 	if err := result.Decode(&user); err != nil {
 		log.Println(err.Error())
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
 	if !utils.ComparePasswordHashes(credentials.Password, user.Password) {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "Invalid credentials",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
@@ -96,9 +86,7 @@ func Login(ctx *gin.Context) {
 	token, err := utils.EncodeJWT(user.Id.Hex(), sessionTime)
 
 	if err != nil {
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "Failed to login",
-		})
+		utils.WriteResponse(ctx, http.StatusOK, "Failed to login")
 		return
 	}
 
@@ -112,10 +100,8 @@ func Login(ctx *gin.Context) {
 		true,
 	)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Logged in",
-		"token":   token,
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Logged in", token)
+
 }
 
 func UpdateUser(ctx *gin.Context) {
@@ -128,15 +114,16 @@ func UpdateUser(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&updates); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	result, err := db.Db.Collection("users").UpdateByID(
+	result := db.UpdateOne(
 		context.Background(),
-		user.Id,
+		models.UserCollection,
+		bson.M{
+			"_id": user.Id,
+		},
 		bson.M{
 			"$set": bson.M{
 				"name":      updates.Name,
@@ -145,14 +132,10 @@ func UpdateUser(ctx *gin.Context) {
 		},
 	)
 
-	if result.ModifiedCount == 0 || err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to update user",
-		})
+	if err := result.Err(); err != nil {
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to update user")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Updated user details",
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Updated user details")
 }

@@ -10,6 +10,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const UserCollection = "users"
+
 type User struct {
 	Id        primitive.ObjectID `json:"_id" bson:"_id"`
 	Name      string             `json:"name" bson:"name" binding:"required"`
@@ -32,5 +34,5 @@ func (user *User) Insert() (*mongo.InsertOneResult, error) {
 	user.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
 	user.UpdatedAt = primitive.NewDateTimeFromTime(time.Now())
 
-	return db.Db.Collection("users").InsertOne(context.TODO(), user)
+	return db.InsertOne(context.Background(), UserCollection, user)
 }

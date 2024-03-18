@@ -27,9 +27,7 @@ func CreateBook(ctx *gin.Context) {
 	var book models.Book
 
 	if err := ctx.ShouldBindJSON(&book); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -39,54 +37,44 @@ func CreateBook(ctx *gin.Context) {
 	_, err := book.Insert()
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Book created",
-		"data":    book,
-	})
+	utils.WriteResponse(ctx, http.StatusCreated, "Book created", book)
 }
 
 func AddPage(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
 	var page models.Page
 
 	if err := ctx.ShouldBindJSON(&page); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	existingBook := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := existingBook.Err(); err != nil {
 		log.Println(err)
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -97,9 +85,7 @@ func AddPage(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't add page to this book",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't add page to this book")
 		return
 	}
 
@@ -107,15 +93,16 @@ func AddPage(ctx *gin.Context) {
 
 	if err != nil {
 		log.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to add page",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to add page")
 		return
 	}
 
-	result, err := db.Db.Collection("books").UpdateByID(
+	result := db.UpdateOne(
 		context.Background(),
-		bookId,
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		},
 		bson.M{
 			"$push": bson.M{
 				"pages": insertResult.InsertedID,
@@ -126,18 +113,13 @@ func AddPage(ctx *gin.Context) {
 		},
 	)
 
-	if err != nil || result.ModifiedCount == 0 {
+	if err := result.Err(); err != nil {
 		log.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to add page",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to add page")
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "Added page to book",
-		"data":    page,
-	})
+	utils.WriteResponse(ctx, http.StatusCreated, "Added page to book", page)
 }
 
 func UpdatePage(ctx *gin.Context) {
@@ -145,18 +127,14 @@ func UpdatePage(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
 	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid page id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid page id")
 		return
 	}
 
@@ -166,29 +144,26 @@ func UpdatePage(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&pageInfo); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	existingBook := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := existingBook.Err(); err != nil {
 		log.Println(err)
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -199,9 +174,7 @@ func UpdatePage(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't update page from this book",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't update page from this book")
 		return
 	}
 
@@ -223,8 +196,9 @@ func UpdatePage(ctx *gin.Context) {
 	}
 
 	options := options.FindOneAndUpdate().SetReturnDocument(options.After)
-	result := db.Db.Collection("pages").FindOneAndUpdate(
+	result := db.UpdateOne(
 		context.Background(),
+		models.PageCollection,
 		bson.M{
 			"_id": pageId,
 		},
@@ -235,64 +209,52 @@ func UpdatePage(ctx *gin.Context) {
 	if err := result.Err(); err != nil {
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Page not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Page not found")
 			return
 		}
 
 		log.Print(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
 	var page models.Page
 	result.Decode(&page)
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Updated page",
-		"data":    page,
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Updated page", page)
 }
 
 func DeletePage(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
 	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid page id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid page id")
 		return
 	}
 
-	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	existingBook := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := existingBook.Err(); err != nil {
 		log.Println(err)
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -303,32 +265,30 @@ func DeletePage(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't delete page from this book",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't delete page from this book")
 		return
 	}
 
-	page := db.Db.Collection("pages").FindOneAndDelete(context.Background(), bson.M{
-		"_id": pageId,
-	})
+	page := db.DeleteOne(
+		context.Background(),
+		models.PageCollection,
+		bson.M{
+			"_id": pageId,
+		})
 
 	if err := page.Err(); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Page not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Page not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to delete",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to delete")
 		return
 	}
 
-	result := db.Db.Collection("books").FindOneAndUpdate(
+	result := db.UpdateOne(
 		context.Background(),
+		models.BookCollection,
 		bson.M{
 			"_id": bookId,
 		},
@@ -341,24 +301,18 @@ func DeletePage(ctx *gin.Context) {
 
 	if err := result.Err(); err != nil {
 		log.Print(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to remove page",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to remove page")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Removed page from book",
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Removed page from book")
 }
 
 func UpdateBook(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
@@ -368,29 +322,26 @@ func UpdateBook(ctx *gin.Context) {
 	}
 
 	if err := ctx.ShouldBindJSON(&bookInfo); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	existingBook := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := existingBook.Err(); err != nil {
 		log.Println(err)
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -401,9 +352,7 @@ func UpdateBook(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't update this book",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't update this book")
 		return
 	}
 
@@ -425,8 +374,9 @@ func UpdateBook(ctx *gin.Context) {
 	}
 
 	options := options.FindOneAndUpdate().SetReturnDocument(options.After)
-	result := db.Db.Collection("books").FindOneAndUpdate(
+	result := db.UpdateOne(
 		context.Background(),
+		models.BookCollection,
 		bson.M{
 			"_id": bookId,
 		},
@@ -437,44 +387,37 @@ func UpdateBook(ctx *gin.Context) {
 	if err := result.Err(); err != nil {
 		log.Println(err)
 
-		ctx.JSON(http.StatusInternalServerError, bson.M{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Updated book",
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Updated book")
 }
 
 func DeleteBook(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
-	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	existingBook := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := existingBook.Err(); err != nil {
 		log.Println(err)
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -485,36 +428,35 @@ func DeleteBook(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't delete this book",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't delete this book")
 		return
 	}
 
-	result := db.Db.Collection("books").FindOneAndDelete(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	result := db.DeleteOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := result.Err(); err != nil {
 		log.Print(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Book deleted",
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Book deleted")
 }
 
 func GetBooks(ctx *gin.Context) {
-	cursor, err := db.Db.Collection("books").Find(context.Background(), bson.M{})
+
+	cursor, err := db.Find(
+		context.Background(),
+		models.BookCollection,
+		bson.M{})
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -523,16 +465,11 @@ func GetBooks(ctx *gin.Context) {
 	err = cursor.All(context.Background(), &books)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to retrieve books",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to retrieve books")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Books retrieved",
-		"data":    books,
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Books retrieved", books)
 }
 
 func GetBook(ctx *gin.Context) {
@@ -540,27 +477,24 @@ func GetBook(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
-	result := db.Db.Collection("books").FindOne(context.Background(), bson.M{"_id": bookId})
+	result := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{"_id": bookId})
 
 	if err := result.Err(); err != nil {
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
 		log.Println(err)
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -568,43 +502,35 @@ func GetBook(ctx *gin.Context) {
 
 	if err := result.Decode(&book); err != nil {
 		log.Println(err.Error())
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Book retrieved",
-		"data":    book,
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Book retrieved", book)
 }
 
 func ChangeBookCover(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
-	existingBook := db.Db.Collection("books").FindOne(context.Background(), bson.M{
-		"_id": bookId,
-	})
+	existingBook := db.FindOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
+		})
 
 	if err := existingBook.Err(); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -615,9 +541,7 @@ func ChangeBookCover(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't change this book's cover",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't change this book's cover")
 		return
 	}
 
@@ -625,18 +549,14 @@ func ChangeBookCover(ctx *gin.Context) {
 	log.Println(formFile.Filename, formFile.Size)
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	tempCover, err := formFile.Open()
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to open file",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to open file")
 		return
 	}
 
@@ -645,30 +565,29 @@ func ChangeBookCover(ctx *gin.Context) {
 
 	if err != nil {
 		log.Println(err)
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "Failed to upload file",
-		})
+		utils.WriteResponse(ctx, http.StatusOK, "Failed to upload file")
 		return
 	}
 
-	updateResult, err := db.Db.Collection("books").UpdateByID(context.Background(), bookId, bson.M{
-		"$set": bson.M{
-			"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
-			"cover":     uploadResult.PublicID,
+	updateResult := db.UpdateOne(
+		context.Background(),
+		models.BookCollection,
+		bson.M{
+			"_id": bookId,
 		},
-	})
-
-	if err != nil || updateResult.ModifiedCount == 0 {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to change cover",
+		bson.M{
+			"$set": bson.M{
+				"updatedAt": primitive.NewDateTimeFromTime(time.Now()),
+				"cover":     uploadResult.PublicID,
+			},
 		})
+
+	if updateResult.Err(); err != nil {
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to change cover")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Changed book cover",
-		"data":    uploadResult.PublicID,
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Changed book cover", uploadResult.PublicID)
 
 	if book.Cover != "" {
 		result, err := utils.DeleteFile(book.Cover, api.Image)
@@ -684,18 +603,14 @@ func ChangePageCover(ctx *gin.Context) {
 	bookId, err := primitive.ObjectIDFromHex(ctx.Param("bookId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid book id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid book id")
 		return
 	}
 
 	pageId, err := primitive.ObjectIDFromHex(ctx.Param("pageId"))
 
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"message": "Invalid page id",
-		})
+		utils.WriteResponse(ctx, http.StatusBadRequest, "Invalid page id")
 		return
 	}
 
@@ -705,15 +620,11 @@ func ChangePageCover(ctx *gin.Context) {
 
 	if err := existingBook.Err(); err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"message": "Book not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Book not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Something went wrong",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Something went wrong")
 		return
 	}
 
@@ -724,27 +635,21 @@ func ChangePageCover(ctx *gin.Context) {
 	user := userFromCtx.(models.User)
 
 	if book.Author != user.Id {
-		ctx.JSON(http.StatusUnauthorized, gin.H{
-			"message": "You can't change this page's cover",
-		})
+		utils.WriteResponse(ctx, http.StatusUnauthorized, "You can't change this page's cover")
 		return
 	}
 
 	formFile, err := ctx.FormFile("cover")
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	tempCover, err := formFile.Open()
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to open file",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to open file")
 		return
 	}
 
@@ -753,14 +658,13 @@ func ChangePageCover(ctx *gin.Context) {
 
 	if err != nil {
 		log.Println(err)
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "Failed to upload file",
-		})
+		utils.WriteResponse(ctx, http.StatusOK, "Failed to upload file")
 		return
 	}
 
-	updateResult := db.Db.Collection("pages").FindOneAndUpdate(
+	updateResult := db.UpdateOne(
 		context.Background(),
+		models.PageCollection,
 		bson.M{
 			"_id": pageId,
 		},
@@ -774,22 +678,15 @@ func ChangePageCover(ctx *gin.Context) {
 	if err := updateResult.Err(); err != nil {
 
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			ctx.JSON(http.StatusInternalServerError, gin.H{
-				"message": "Page not found",
-			})
+			utils.WriteResponse(ctx, http.StatusNotFound, "Page not found")
 			return
 		}
 
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"message": "Failed to change cover",
-		})
+		utils.WriteResponse(ctx, http.StatusInternalServerError, "Failed to change cover")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "Changed page cover",
-		"data":    uploadResult.PublicID,
-	})
+	utils.WriteResponse(ctx, http.StatusOK, "Changed page cover", uploadResult.PublicID)
 
 	var page models.Page
 	updateResult.Decode(&page)

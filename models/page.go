@@ -9,6 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const PageCollection = "pages"
+
 type Page struct {
 	Id        primitive.ObjectID `json:"_id" bson:"_id"`
 	Title     string             `json:"title" bson:"title" binding:"required"`
@@ -24,5 +26,5 @@ func (page *Page) Insert() (*mongo.InsertOneResult, error) {
 	page.CreatedAt = primitive.NewDateTimeFromTime(time.Now())
 	page.UpdatedAt = primitive.NewDateTimeFromTime(time.Now())
 
-	return db.Db.Collection("pages").InsertOne(context.TODO(), page)
+	return db.InsertOne(context.Background(), PageCollection, page)
 }
