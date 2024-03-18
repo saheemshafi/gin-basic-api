@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -45,5 +47,11 @@ func main() {
 
 	routes.Register(app)
 
-	log.Fatal(app.Run(":5000"))
+	var port string = os.Getenv("PORT")
+
+	if port == "" {
+		log.Print("Port not specified in env... Defaulting to 5000")
+		port = "5000"
+	}
+	log.Fatal(app.Run(fmt.Sprintf(":%v", port)))
 }
